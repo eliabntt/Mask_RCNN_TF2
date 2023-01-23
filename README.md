@@ -6,8 +6,10 @@ The [Mask-RCNN-TF2]() project edits the original [Mask_RCNN](https://github.com/
 
 Compared to the source code of the old [Mask_RCNN](https://github.com/matterport/Mask_RCNN) project this edits the following 2 modules:
 
-1. `model.py`
-2. `utils.py`
+1. `mrcnn/model.py` - edits to account for TF2.x
+2. `mrcnn/utils.py` - a two liner using `tf.math`
+3. `samples/coco.py` - a one-liner to add support for evaluating a subset of classes automatically. Does not influence any previous script
+4. `requirements.txt`
 
 While adding some additional scripts in `mrcnn` folder, such as:
 
