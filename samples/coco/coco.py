@@ -374,14 +374,18 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
                                            r["rois"], r["class_ids"],
                                            r["scores"],
                                            r["masks"].astype(np.uint8))
+
         results.extend(image_results)
 
     # Load results. This modifies results with additional attributes.
     coco_results = coco.loadRes(results)
 
+    import ipdb; ipdb.set_trace()
+
     # Evaluate
     cocoEval = COCOeval(coco, coco_results, eval_type)
     cocoEval.params.imgIds = coco_image_ids
+    cocoEval.params.catIds = dataset.class_ids[1:]
     cocoEval.evaluate()
     cocoEval.accumulate()
     cocoEval.summarize()

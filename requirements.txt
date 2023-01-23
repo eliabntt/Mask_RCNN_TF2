@@ -4,9 +4,13 @@ Pillow
 cython
 matplotlib
 scikit-image==0.16.2
-tensorflow==2.7.0
+tensorflow==2.4.0
+tensorflow-estimator==2.4.0
+tensorflow-gpu==2.4.0
+tensorflow-io-gcs-filesystem==0.29.0
 keras==2.7.0
 opencv-python
 h5py==2.10.0
 imgaug
 IPython[all]
+pycocotools

@@ -8,9 +8,11 @@ Written by Waleed Abdulla
 """
 
 import os
+import random
 import datetime
 import re
 import math
+import logging
 from collections import OrderedDict
 import multiprocessing
 import numpy as np
@@ -2119,24 +2121,46 @@ class MaskRCNN(object):
 
         if h5py is None:
             raise ImportError('`load_weights` requires h5py.')
-        with h5py.File(filepath, mode='r') as f:
-            if 'layer_names' not in f.attrs and 'model_weights' in f:
-                f = f['model_weights']
+        f = h5py.File(filepath, mode='r')
+        if 'layer_names' not in f.attrs and 'model_weights' in f:
+            f = f['model_weights']
 
-            # In multi-GPU training, we wrap the model. Get layers
-            # of the inner model because they have the weights.
-            keras_model = self.keras_model
-            layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
-                else keras_model.layers
+        # In multi-GPU training, we wrap the model. Get layers
+        # of the inner model because they have the weights.
+        keras_model = self.keras_model
+        tmp_layers = keras_model.inner_model.layers if hasattr(keras_model, "inner_model")\
+            else keras_model.layers
 
-            # Exclude some layers
-            if exclude:
-                layers = filter(lambda l: l.name not in exclude, layers)
+        # Exclude some layers
+        layer_regex = {
+            # all layers but the backbone
+            "heads": r"(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
+            # From a specific Resnet stage and up
+            "3+": r"(res3.*)|(bn3.*)|(res4.*)|(bn4.*)|(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
+            "4+": r"(res4.*)|(bn4.*)|(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
+            "5+": r"(res5.*)|(bn5.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
+            # All layers
+            "all": ".*",
+        }
+        if exclude in layer_regex.keys():
+            exclude = layer_regex[exclude]
+            layers = []
+            print("Loading....")
+            for layer in tmp_layers:
+                if not bool(re.fullmatch(exclude, layer.name)):
+                    layers.append(layer)
+                    print(layer.name)
+        else:
+            layers = tmp_layers
+        print("Check loaded layers...")
+        
 
-            if by_name:
-                hdf5_format.load_weights_from_hdf5_group_by_name(f, layers)
-            else:
-                hdf5_format.load_weights_from_hdf5_group(f, layers)
+        if by_name:
+            hdf5_format.load_weights_from_hdf5_group_by_name(f, layers)
+        else:
+            hdf5_format.load_weights_from_hdf5_group(f, layers)
+        if hasattr(f, 'close'):
+            f.close()
 
         # Update the log directory
         self.set_log_dir(filepath)
@@ -2304,8 +2328,8 @@ class MaskRCNN(object):
                     imgaug.augmenters.Fliplr(0.5),
                     imgaug.augmenters.GaussianBlur(sigma=(0.0, 5.0))
                 ])
-	    custom_callbacks: Optional. Add custom callbacks to be called
-	        with the keras fit_generator method. Must be list of type keras.callbacks.
+        custom_callbacks: Optional. Add custom callbacks to be called
+            with the keras fit_generator method. Must be list of type keras.callbacks.
         no_augmentation_sources: Optional. List of sources to exclude for
             augmentation. A source is string that identifies a dataset and is
             defined in the Dataset class.
@@ -2360,7 +2384,7 @@ class MaskRCNN(object):
             workers = 0
         else:
             workers = multiprocessing.cpu_count()
-
+        workers = 1
         self.keras_model.fit(
             train_generator,
             initial_epoch=self.epoch,
@@ -2370,7 +2394,7 @@ class MaskRCNN(object):
             validation_data=val_generator,
             validation_steps=self.config.VALIDATION_STEPS,
             max_queue_size=100,
-            workers=0,
+            workers=workers,
             use_multiprocessing=False,
         )
         self.epoch = max(self.epoch, epochs)
