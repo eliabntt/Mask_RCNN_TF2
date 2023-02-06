@@ -366,24 +366,30 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         # Run detection
         t = time.time()
         r = model.detect([image], verbose=0)[0]
+        tmp = r
+        interest_list = np.where(r["class_ids"][:, None] == dataset.class_ids)[0]
+
         t_prediction += (time.time() - t)
 
         # Convert results to COCO format
         # Cast masks to uint8 because COCO tools errors out on bool
         image_results = build_coco_results(dataset, coco_image_ids[i:i + 1],
-                                           r["rois"], r["class_ids"],
-                                           r["scores"],
-                                           r["masks"].astype(np.uint8))
-
+                                           r["rois"][interest_list], r["class_ids"][interest_list],
+                                           r["scores"][interest_list],
+                                           r["masks"][:,:,interest_list].astype(np.uint8))
         results.extend(image_results)
-
     # Load results. This modifies results with additional attributes.
     coco_results = coco.loadRes(results)
 
-    import ipdb; ipdb.set_trace()
-
     # Evaluate
-    cocoEval = COCOeval(coco, coco_results, eval_type)
+    cocoEval = COCOeval(coco, coco_results, "segm")
+    cocoEval.params.imgIds = coco_image_ids
+    cocoEval.params.catIds = dataset.class_ids[1:]
+    cocoEval.evaluate()
+    cocoEval.accumulate()
+    cocoEval.summarize()
+
+    cocoEval = COCOeval(coco, coco_results, "bbox")
     cocoEval.params.imgIds = coco_image_ids
     cocoEval.params.catIds = dataset.class_ids[1:]
     cocoEval.evaluate()
